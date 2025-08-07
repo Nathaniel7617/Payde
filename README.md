@@ -438,4 +438,5 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 **Built with ❤️ by the Payde Team**
 
-*Empowering financial inclusion across Africa and beyond*
+*Empowering financial inclusion across Africa and beyond*#   P a y d e  
+ 

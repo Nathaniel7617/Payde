@@ -94,7 +94,9 @@ const SecurityIndicator: React.FC<SecurityIndicatorProps> = ({
     return (
       <Pressable onPress={onPress}>
         <Tooltip label={securityInfo.description} placement="bottom">
-          <SecurityBadge />
+          <Box>
+            <SecurityBadge />
+          </Box>
         </Tooltip>
       </Pressable>
     );

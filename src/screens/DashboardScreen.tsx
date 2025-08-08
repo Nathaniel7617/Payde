@@ -230,12 +230,13 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation }) => {
 
           {/* Notifications */}
           {mockNotifications.slice(0, 1).map(notification => (
-            <NotificationBanner
-              key={notification.id}
-              notification={notification}
-              onPress={() => navigation.navigate('Notifications')}
-              onDismiss={() => {}}
-            />
+            <Box key={notification.id}>
+              <NotificationBanner
+                notification={notification}
+                onPress={() => navigation.navigate('Notifications')}
+                onDismiss={() => {}}
+              />
+            </Box>
           ))}
 
           {/* Balance Card */}
@@ -286,14 +287,15 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation }) => {
               
               <HStack space={3}>
                 {quickActions.map((action, index) => (
-                  <QuickActionButton
-                    key={action.title}
-                    title={action.title}
-                    icon={action.icon}
-                    color={action.color}
-                    onPress={action.onPress}
-                    flex={1}
-                  />
+                  <Box key={action.title} flex={1}>
+                    <QuickActionButton
+                      title={action.title}
+                      icon={action.icon}
+                      color={action.color}
+                      onPress={action.onPress}
+                      flex={1}
+                    />
+                  </Box>
                 ))}
               </HStack>
             </VStack>
@@ -331,12 +333,13 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation }) => {
                 </Box>
               ) : (
                 transactions.slice(0, 5).map((transaction, index) => (
-                  <TransactionListItem
-                    key={transaction.id}
-                    transaction={transaction}
-                    onPress={() => navigation.navigate('TransactionDetails', { transactionId: transaction.id })}
-                    showDivider={index < Math.min(transactions.length, 5) - 1}
-                  />
+                  <Box key={transaction.id}>
+                    <TransactionListItem
+                      transaction={transaction}
+                      onPress={() => navigation.navigate('TransactionDetails', { transactionId: transaction.id })}
+                      showDivider={index < Math.min(transactions.length, 5) - 1}
+                    />
+                  </Box>
                 ))
               )}
             </VStack>

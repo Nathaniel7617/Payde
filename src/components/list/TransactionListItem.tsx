@@ -71,37 +71,51 @@ const TransactionListItem: React.FC<TransactionListItemProps> = ({
     }
   };
 
-  const getStatusColor = (status: TransactionStatus): string => {
-    switch (status) {
+  const getStatusColor = (status: TransactionStatus | string): string => {
+    const statusValue = typeof status === 'string' ? status : status;
+    switch (statusValue) {
       case TransactionStatus.SUCCESSFUL:
+      case 'successful':
         return 'green';
       case TransactionStatus.FAILED:
+      case 'failed':
         return 'red';
       case TransactionStatus.PENDING:
       case TransactionStatus.PROCESSING:
+      case 'pending':
+      case 'processing':
         return 'orange';
       case TransactionStatus.CANCELLED:
+      case 'cancelled':
         return 'gray';
       case TransactionStatus.REVERSED:
+      case 'reversed':
         return 'blue';
       default:
         return 'gray';
     }
   };
 
-  const getStatusText = (status: TransactionStatus): string => {
-    switch (status) {
+  const getStatusText = (status: TransactionStatus | string): string => {
+    const statusValue = typeof status === 'string' ? status : status;
+    switch (statusValue) {
       case TransactionStatus.SUCCESSFUL:
+      case 'successful':
         return 'Success';
       case TransactionStatus.FAILED:
+      case 'failed':
         return 'Failed';
       case TransactionStatus.PENDING:
+      case 'pending':
         return 'Pending';
       case TransactionStatus.PROCESSING:
+      case 'processing':
         return 'Processing';
       case TransactionStatus.CANCELLED:
+      case 'cancelled':
         return 'Cancelled';
       case TransactionStatus.REVERSED:
+      case 'reversed':
         return 'Reversed';
       default:
         return 'Unknown';

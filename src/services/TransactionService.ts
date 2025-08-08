@@ -32,6 +32,8 @@ export enum TransactionType {
   AIRTIME_PURCHASE = 'airtime_purchase',
   DATA_PURCHASE = 'data_purchase',
   CARD_FUNDING = 'card_funding',
+  CARD_TRANSACTION = 'card_transaction',
+  WALLET_FUNDING = 'wallet_funding',
   WITHDRAWAL = 'withdrawal'
 }
 
@@ -74,9 +76,41 @@ export enum TransactionStatus {
   PENDING = 'pending',
   PROCESSING = 'processing',
   COMPLETED = 'completed',
+  SUCCESSFUL = 'successful',
   FAILED = 'failed',
+  REVERSED = 'reversed',
   CANCELLED = 'cancelled',
   REQUIRES_VERIFICATION = 'requires_verification'
+}
+
+export interface Transaction {
+  id: string;
+  type: TransactionType | string;
+  status: TransactionStatus | string;
+  amount: number;
+  currency: string;
+  description: string;
+  reference: string;
+  senderId: string;
+  senderName: string;
+  senderAccount: string;
+  senderPhone?: string;
+  senderEmail?: string;
+  recipientName: string;
+  recipientAccount: string;
+  recipientPhone?: string;
+  recipientEmail?: string;
+  fees?: {
+    transactionFee: number;
+    total: number;
+  };
+  balanceSnapshot?: {
+    before: number;
+    after: number;
+    currency: string;
+  };
+  createdAt: string;
+  completedAt?: string;
 }
 
 export class TransactionService {
@@ -313,6 +347,7 @@ export class TransactionService {
 
     return {
       fees,
+      totalAmount: request.amount + fees.total,
       exchangeRate: await this.getApplicableExchangeRate(request),
       estimatedProcessingTime: this.estimateProcessingTime(request.type)
     };
@@ -709,6 +744,7 @@ interface LimitCheckResult {
 
 interface FeeCalculation {
   fees: FeeBreakdown;
+  totalAmount: number;
   exchangeRate?: number;
   estimatedProcessingTime: number;
 }

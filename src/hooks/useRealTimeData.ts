@@ -48,15 +48,20 @@ export const useRealTimeData = (options: UseRealTimeDataOptions = {}) => {
         currency: transactionUpdate.currency,
         type: transactionUpdate.type as any,
         description: transactionUpdate.description,
-        status: 'SUCCESS' as any,
+        status: 'successful' as any,
         createdAt: transactionUpdate.timestamp,
         completedAt: transactionUpdate.timestamp,
-        reference: `REF-${transactionUpdate.transactionId}`
+        reference: `REF-${transactionUpdate.transactionId}`,
+        senderId: 'user_current',
+        senderName: 'Current User',
+        senderAccount: '0000000000',
+        recipientName: 'Unknown',
+        recipientAccount: '0000000001'
       }));
     } else {
       dispatch(updateTransactionStatus({
         id: transactionUpdate.transactionId,
-        status: transactionUpdate.status === 'completed' ? 'SUCCESS' : 'PENDING' as any
+        status: transactionUpdate.status === 'completed' ? 'successful' : 'pending' as any
       }));
     }
   }, [dispatch]);

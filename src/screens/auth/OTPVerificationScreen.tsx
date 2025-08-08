@@ -129,27 +129,28 @@ function OTPVerificationScreen({ navigation, route }: StackScreenProps<AuthStack
           <VStack space={6}>
             <HStack justifyContent="space-between" px={4}>
               {otp.map((digit, index) => (
-                <Input
-                  key={index}
-                  ref={(ref) => (inputRefs.current[index] = ref)}
-                  value={digit}
-                  onChangeText={(value) => handleOtpChange(value, index)}
-                  onKeyPress={({ nativeEvent }) => handleKeyPress(nativeEvent.key, index)}
-                  maxLength={1}
-                  keyboardType="numeric"
-                  textAlign="center"
-                  fontSize="xl"
-                  fontWeight="bold"
-                  w={12}
-                  h={12}
-                  borderRadius="lg"
-                  borderWidth={2}
-                  borderColor={digit ? 'primary.500' : 'gray.200'}
-                  _focus={{
-                    borderColor: 'primary.500',
-                    backgroundColor: 'white'
-                  }}
-                />
+                <Box key={index}>
+                  <Input
+                    ref={(ref) => (inputRefs.current[index] = ref)}
+                    value={digit}
+                    onChangeText={(value) => handleOtpChange(value, index)}
+                    onKeyPress={(event: any) => handleKeyPress(event.nativeEvent?.key || '', index)}
+                    maxLength={1}
+                    keyboardType="numeric"
+                    textAlign="center"
+                    fontSize="xl"
+                    fontWeight="bold"
+                    w={12}
+                    h={12}
+                    borderRadius="lg"
+                    borderWidth={2}
+                    borderColor={digit ? 'primary.500' : 'gray.200'}
+                    _focus={{
+                      borderColor: 'primary.500',
+                      backgroundColor: 'white'
+                    }}
+                  />
+                </Box>
               ))}
             </HStack>
 

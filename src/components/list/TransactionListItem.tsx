@@ -168,7 +168,7 @@ const TransactionListItem: React.FC<TransactionListItemProps> = ({
     TransactionType.AIRTIME_PURCHASE,
     TransactionType.DATA_PURCHASE,
     TransactionType.WITHDRAWAL
-  ].includes(transaction.type);
+  ].includes(transaction.type as TransactionType);
 
   return (
     <Pressable onPress={onPress}>
@@ -207,7 +207,7 @@ const TransactionListItem: React.FC<TransactionListItemProps> = ({
                     color={textColor}
                     numberOfLines={1}
                   >
-                    {formatTransactionType(transaction.type)}
+                    {formatTransactionType(transaction.type as TransactionType)}
                   </Text>
                   <Text
                     fontSize="sm"

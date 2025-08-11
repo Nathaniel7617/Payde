@@ -243,8 +243,9 @@ function TransactionDetailsScreen({ navigation, route }: StackScreenProps<MainSt
     TransactionType.BILL_PAYMENT,
     TransactionType.AIRTIME_PURCHASE,
     TransactionType.DATA_PURCHASE,
-    TransactionType.WITHDRAWAL
-  ].includes(transaction.type);
+    TransactionType.WITHDRAWAL,
+    TransactionType.CARD_TRANSACTION,
+  ].includes(transaction.type as TransactionType);
 
   return (
     <Box flex={1} bg={bgColor} safeArea>
@@ -298,7 +299,7 @@ function TransactionDetailsScreen({ navigation, route }: StackScreenProps<MainSt
                 </Text>
                 
                 <Text fontSize="sm" color={subtextColor}>
-                  {formatTransactionType(transaction.type)}
+                  {formatTransactionType(transaction.type as TransactionType)}
                 </Text>
               </VStack>
             </VStack>

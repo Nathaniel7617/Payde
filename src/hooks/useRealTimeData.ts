@@ -3,6 +3,7 @@ import { useAppDispatch, useAppSelector } from '../store';
 import realTimeService, { BalanceUpdate, TransactionUpdate, NotificationUpdate } from '../services/RealTimeService';
 import { updateBalanceRealTime } from '../store/slices/accountSlice';
 import { updateTransactionStatus, addTransaction } from '../store/slices/transactionSlice';
+import { TransactionStatus, TransactionType } from '../services/TransactionService';
 import { addNotification } from '../store/slices/notificationSlice';
 
 export interface UseRealTimeDataOptions {
@@ -41,22 +42,38 @@ export const useRealTimeData = (options: UseRealTimeDataOptions = {}) => {
   const handleTransactionUpdate = useCallback((transactionUpdate: TransactionUpdate) => {
     console.log('Real-time transaction update:', transactionUpdate);
     
+    const mapStatus = (s: TransactionUpdate['status']): TransactionStatus => {
+      switch (s) {
+        case 'completed':
+          return TransactionStatus.SUCCESSFUL;
+        case 'failed':
+          return TransactionStatus.FAILED;
+        case 'cancelled':
+          return TransactionStatus.CANCELLED;
+        case 'pending':
+        default:
+          return TransactionStatus.PENDING;
+      }
+    };
+
     if (transactionUpdate.status === 'completed') {
       dispatch(addTransaction({
         id: transactionUpdate.transactionId,
         amount: transactionUpdate.amount,
         currency: transactionUpdate.currency,
-        type: transactionUpdate.type as any,
+        type: transactionUpdate.type as unknown as TransactionType,
         description: transactionUpdate.description,
-        status: 'SUCCESS' as any,
+        status: TransactionStatus.SUCCESSFUL,
         createdAt: transactionUpdate.timestamp,
         completedAt: transactionUpdate.timestamp,
-        reference: `REF-${transactionUpdate.transactionId}`
-      }));
+        reference: `REF-${transactionUpdate.transactionId}`,
+        senderId: 'user_001',
+        senderName: 'Jane Smith'
+      } as any));
     } else {
       dispatch(updateTransactionStatus({
         id: transactionUpdate.transactionId,
-        status: transactionUpdate.status === 'completed' ? 'SUCCESS' : 'PENDING' as any
+        status: mapStatus(transactionUpdate.status)
       }));
     }
   }, [dispatch]);

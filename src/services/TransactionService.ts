@@ -32,7 +32,9 @@ export enum TransactionType {
   AIRTIME_PURCHASE = 'airtime_purchase',
   DATA_PURCHASE = 'data_purchase',
   CARD_FUNDING = 'card_funding',
-  WITHDRAWAL = 'withdrawal'
+  WITHDRAWAL = 'withdrawal',
+  WALLET_FUNDING = 'wallet_funding',
+  CARD_TRANSACTION = 'card_transaction',
 }
 
 export interface TransactionResult {
@@ -42,6 +44,14 @@ export interface TransactionResult {
   receipt?: TransactionReceipt;
   error?: string;
   requiresAdditionalAuth?: boolean;
+}
+
+export interface FeeBreakdown {
+  transactionFee: number;
+  exchangeFee?: number;
+  processingFee?: number;
+  total: number;
+  currency: string;
 }
 
 export interface TransactionReceipt {
@@ -62,20 +72,48 @@ export interface TransactionReceipt {
   confirmationCode?: string;
 }
 
-export interface FeeBreakdown {
-  transactionFee: number;
-  exchangeFee?: number;
-  processingFee?: number;
-  total: number;
+// Add a Transaction interface for UI/state usage
+export interface Transaction {
+  id: string;
+  type: TransactionType;
+  status: TransactionStatus;
+  amount: number;
   currency: string;
+  description?: string;
+  reference: string;
+  senderId: string;
+  senderName: string;
+  senderAccount?: string;
+  senderPhone?: string;
+  senderEmail?: string;
+  recipientName?: string;
+  recipientAccount?: string;
+  recipientPhone?: string;
+  recipientEmail?: string;
+  fees?: {
+    transactionFee: number;
+    exchangeFee?: number;
+    processingFee?: number;
+    total: number;
+  };
+  balanceSnapshot?: {
+    before: number;
+    after: number;
+    currency: string;
+  };
+  createdAt: string;
+  completedAt?: string;
+  additionalInfo?: Record<string, any>;
 }
 
 export enum TransactionStatus {
   PENDING = 'pending',
   PROCESSING = 'processing',
-  COMPLETED = 'completed',
+  SUCCESSFUL = 'successful',
   FAILED = 'failed',
   CANCELLED = 'cancelled',
+  REVERSED = 'reversed',
+  COMPLETED = 'completed',
   REQUIRES_VERIFICATION = 'requires_verification'
 }
 
@@ -130,7 +168,7 @@ export class TransactionService {
       const session = await this.createTransactionSession(request, feeCalculation);
 
       // Step 5: Determine authentication requirements
-      const authRequirements = this.determineAuthRequirements(request, feeCalculation.total);
+      const authRequirements = this.determineAuthRequirements(request, feeCalculation.fees.total);
 
       return {
         success: true,
@@ -336,7 +374,23 @@ export class TransactionService {
         return await this.executeDataPurchase(session);
       
       case TransactionType.CARD_FUNDING:
+      case TransactionType.CARD_TRANSACTION:
         return await this.executeCardFunding(session);
+      
+      case TransactionType.WITHDRAWAL:
+        // Simulate withdrawal as domestic transfer reversal-like
+        return {
+          success: true,
+          reference: session.reference,
+          status: TransactionStatus.PROCESSING
+        };
+      
+      case TransactionType.WALLET_FUNDING:
+        return {
+          success: true,
+          reference: session.reference,
+          status: TransactionStatus.SUCCESSFUL
+        };
       
       default:
         throw new Error(`Unsupported transaction type: ${session.request.type}`);
@@ -463,7 +517,7 @@ export class TransactionService {
       return {
         success: true,
         reference: response.transactionReference,
-        status: TransactionStatus.COMPLETED, // Bill payments are usually instant
+        status: TransactionStatus.SUCCESSFUL, // Bill payments are usually instant
         confirmationCode: response.confirmationCode
       };
     }
@@ -490,7 +544,7 @@ export class TransactionService {
       fees: session.feeCalculation.fees,
       recipient: session.request.recipient || {} as RecipientDetails,
       sender: userDetails,
-      status: executionResult.status || TransactionStatus.COMPLETED,
+      status: executionResult.status || TransactionStatus.SUCCESSFUL,
       timestamp: Date.now(),
       exchangeRate: session.feeCalculation.exchangeRate,
       processingTime: session.feeCalculation.estimatedProcessingTime,
@@ -566,7 +620,7 @@ export class TransactionService {
       }
 
       // Check if transaction can be cancelled
-      if (session.status === TransactionStatus.COMPLETED) {
+      if (session.status === TransactionStatus.SUCCESSFUL || session.status === TransactionStatus.COMPLETED) {
         return { success: false, error: 'Cannot cancel completed transaction' };
       }
 
@@ -689,14 +743,212 @@ export class TransactionService {
       [TransactionType.BILL_PAYMENT]: 1 * 60 * 1000, // 1 minute
       [TransactionType.AIRTIME_PURCHASE]: 30 * 1000, // 30 seconds
       [TransactionType.DATA_PURCHASE]: 30 * 1000, // 30 seconds
-      [TransactionType.CARD_FUNDING]: 10 * 60 * 1000 // 10 minutes
-    };
+      [TransactionType.CARD_FUNDING]: 10 * 60 * 1000, // 10 minutes
+      [TransactionType.CARD_TRANSACTION]: 10 * 60 * 1000, // 10 minutes
+      [TransactionType.WALLET_FUNDING]: 10 * 1000, // 10 seconds
+      [TransactionType.WITHDRAWAL]: 2 * 60 * 1000, // 2 minutes
+    } as const;
 
-    return processingTimes[type] || 5 * 60 * 1000;
+    return (processingTimes as any)[type] || 5 * 60 * 1000;
+  }
+
+  private async validateAccountNumber(accountNumber: string, bankCode?: string, country?: string): Promise<AccountValidationResult> {
+    if (!accountNumber || accountNumber.replace(/\D/g, '').length < 6) {
+      return { isValid: false, error: 'Invalid account number' };
+    }
+    return { isValid: true };
+  }
+
+  private async getCurrentUserId(): Promise<string> {
+    const stored = await SecureStore.getItemAsync('current_user_id');
+    return stored || 'user_001';
+  }
+
+  private async getUserTransactionLimits(userId: string): Promise<{ dailyLimit: number; singleTransactionLimit: number; monthlyLimit: number; internationalDailyLimit: number; }> {
+    return {
+      dailyLimit: this.TRANSACTION_LIMITS.DAILY_LIMIT,
+      singleTransactionLimit: this.TRANSACTION_LIMITS.SINGLE_TRANSACTION_LIMIT,
+      monthlyLimit: this.TRANSACTION_LIMITS.MONTHLY_LIMIT,
+      internationalDailyLimit: this.TRANSACTION_LIMITS.INTERNATIONAL_DAILY_LIMIT,
+    };
+  }
+
+  private async getTodaySpentAmount(userId: string): Promise<number> {
+    const history = await this.getTransactionHistory(userId);
+    const start = new Date();
+    start.setHours(0, 0, 0, 0);
+    return history
+      .filter(h => h.timestamp >= start.getTime())
+      .reduce((sum, h) => sum + (h.amount || 0), 0);
+  }
+
+  private async getMonthlySpentAmount(userId: string): Promise<number> {
+    const history = await this.getTransactionHistory(userId);
+    const start = new Date();
+    start.setDate(1);
+    start.setHours(0, 0, 0, 0);
+    return history
+      .filter(h => h.timestamp >= start.getTime())
+      .reduce((sum, h) => sum + (h.amount || 0), 0);
+  }
+
+  private async getTodayInternationalSpent(userId: string): Promise<number> {
+    const history = await this.getTransactionHistory(userId);
+    const start = new Date();
+    start.setHours(0, 0, 0, 0);
+    return history
+      .filter(h => h.timestamp >= start.getTime() && h.type === TransactionType.INTERNATIONAL_TRANSFER)
+      .reduce((sum, h) => sum + (h.amount || 0), 0);
+  }
+
+  private async getFeeStructure(type: TransactionType, currency: string): Promise<FeeStructure> {
+    // Simple demo rates
+    const baseRate = 0.005; // 0.5%
+    const exchangeRate = type === TransactionType.INTERNATIONAL_TRANSFER ? 0.01 : 0; // 1%
+    const processingFee = 50; // flat minor units
+    return { baseRate, exchangeRate, processingFee };
+  }
+
+  private async getDestinationCurrency(country: string): Promise<string> {
+    const map: Record<string, string> = {
+      NG: 'NGN',
+      US: 'USD',
+      GB: 'GBP',
+      EU: 'EUR',
+    };
+    return map[country] || 'USD';
+  }
+
+  private async getApplicableExchangeRate(request: TransactionRequest): Promise<number> {
+    if (request.type === TransactionType.INTERNATIONAL_TRANSFER && request.recipient?.country) {
+      const target = await this.getDestinationCurrency(request.recipient.country);
+      return this.currencyService.getExchangeRate(request.currency, target);
+    }
+    return 1;
+  }
+
+  private async executeAirtimePurchase(session: TransactionSession): Promise<ExecutionResult> {
+    // Simulate success
+    return {
+      success: true,
+      reference: session.reference,
+      status: TransactionStatus.SUCCESSFUL,
+      confirmationCode: `AIR-${Math.random().toString(36).substring(2, 8).toUpperCase()}`,
+    };
+  }
+
+  private async executeDataPurchase(session: TransactionSession): Promise<ExecutionResult> {
+    return {
+      success: true,
+      reference: session.reference,
+      status: TransactionStatus.SUCCESSFUL,
+      confirmationCode: `DAT-${Math.random().toString(36).substring(2, 8).toUpperCase()}`,
+    };
+  }
+
+  private async executeCardFunding(session: TransactionSession): Promise<ExecutionResult> {
+    return {
+      success: true,
+      reference: session.reference,
+      status: TransactionStatus.PROCESSING,
+    };
+  }
+
+  private async performComplianceCheck(session: TransactionSession): Promise<ComplianceCheckResult> {
+    return {
+      passed: true,
+      reference: `CMP-${Math.random().toString(36).substring(2, 8).toUpperCase()}`,
+    };
+  }
+
+  private async verifyBillDetails(billData: any): Promise<BillVerificationResult> {
+    // Assume valid for demo
+    return { valid: true };
+  }
+
+  private async sendTransactionNotifications(receipt: TransactionReceipt): Promise<void> {
+    console.log('Sending transaction notifications for', receipt.reference);
+  }
+
+  private async updateTransactionHistory(receipt: TransactionReceipt): Promise<void> {
+    try {
+      const userId = receipt.sender.id;
+      const key = `transaction_history_${userId}`;
+      const historyData = await SecureStore.getItemAsync(key);
+      let list: TransactionReceipt[] = [];
+      if (historyData) {
+        const decrypted = await this.encryptionService.decrypt(JSON.parse(historyData));
+        list = JSON.parse(decrypted);
+      }
+      list.unshift(receipt);
+      const encrypted = await this.encryptionService.encrypt(JSON.stringify(list));
+      await SecureStore.setItemAsync(key, JSON.stringify(encrypted));
+    } catch (e) {
+      console.error('Failed to update transaction history', e);
+    }
+  }
+
+  private async logTransactionError(context: any, error: any): Promise<void> {
+    console.error('Transaction error:', { context, error });
+  }
+
+  private async getTransactionSession(transactionId: string): Promise<TransactionSession | null> {
+    try {
+      const stored = await SecureStore.getItemAsync(`transaction_session_${transactionId}`);
+      if (!stored) return null;
+      const decrypted = await this.encryptionService.decrypt(JSON.parse(stored));
+      return JSON.parse(decrypted) as TransactionSession;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  private async updateTransactionSession(session: TransactionSession): Promise<void> {
+    const encrypted = await this.encryptionService.encrypt(JSON.stringify(session));
+    await SecureStore.setItemAsync(`transaction_session_${session.id}`, JSON.stringify(encrypted));
+  }
+
+  private getAuthRequirementReason(request: TransactionRequest, totalAmount: number): string {
+    if (request.type === TransactionType.INTERNATIONAL_TRANSFER) {
+      return 'International transfers require OTP verification for compliance.';
+    }
+    if (totalAmount > this.HIGH_VALUE_THRESHOLD) {
+      return 'High-value transactions require additional biometric verification.';
+    }
+    return 'Standard authentication required.';
+  }
+
+  private async performFinalBalanceCheck(session: TransactionSession): Promise<{ sufficient: boolean }>
+  {
+    // In real implementation, fetch actual balance and compare
+    return { sufficient: true };
+  }
+
+  private async getUserDetails(userId: string): Promise<UserDetails> {
+    return {
+      id: userId,
+      name: 'Jane Smith',
+      email: 'jane@example.com',
+      phoneNumber: '+234-800-123-4567',
+      accountNumber: '1234567890',
+    };
+  }
+
+  private applyTransactionFilters(transactions: TransactionReceipt[], filters: TransactionFilters): TransactionReceipt[] {
+    return transactions.filter(t => {
+      if (filters.type && t.type !== filters.type) return false;
+      if (filters.status && t.status !== filters.status) return false;
+      if (filters.currency && t.currency !== filters.currency) return false;
+      if (filters.dateFrom && t.timestamp < filters.dateFrom) return false;
+      if (filters.dateTo && t.timestamp > filters.dateTo) return false;
+      if (typeof filters.minAmount === 'number' && t.amount < filters.minAmount) return false;
+      if (typeof filters.maxAmount === 'number' && t.amount > filters.maxAmount) return false;
+      return true;
+    });
   }
 }
 
-// Type definitions for transaction-related interfaces
+// Add missing auxiliary interfaces
 interface ValidationResult {
   isValid: boolean;
   error?: string;
@@ -766,4 +1018,27 @@ interface UserDetails {
   email: string;
   phoneNumber: string;
   accountNumber: string;
+}
+
+// New interfaces for internal helper methods
+interface AccountValidationResult {
+  isValid: boolean;
+  error?: string;
+}
+
+interface ComplianceCheckResult {
+  passed: boolean;
+  reference?: string;
+  reason?: string;
+}
+
+interface BillVerificationResult {
+  valid: boolean;
+  error?: string;
+}
+
+interface FeeStructure {
+  baseRate: number;
+  exchangeRate: number;
+  processingFee: number;
 }

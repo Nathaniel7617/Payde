@@ -82,7 +82,7 @@ const TransactionHistoryScreen: React.FC<TransactionHistoryScreenProps> = ({ nav
 
   const renderTransactionItem = ({ item, index }: { item: any; index: number }) => (
     <TransactionListItem
-      transaction={item}
+      transaction={item as any}
       onPress={() => navigation.navigate('TransactionDetails', { transactionId: item.id })}
       showDivider={index < transactions.length - 1}
     />
